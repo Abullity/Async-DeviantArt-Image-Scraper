@@ -47,20 +47,3 @@ async def main(account):
     async with aiohttp.ClientSession() as session:
         while params["offset"] is not None:
             await request_next_bunch(session, params)
-
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise Exception("Program needs 1 argument -- Deviantart account name!")
-
-    account = sys.argv[1]
-    try:
-        os.mkdir(account)
-        os.chdir(account)
-        start = time.perf_counter()
-        asyncio.run(main(account))
-        print(f"scraped in {time.perf_counter() - start} seconds!")
-    except FileExistsError:
-        print(f"{account} has already been scraped!")
-    
