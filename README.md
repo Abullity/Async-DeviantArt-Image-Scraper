@@ -51,6 +51,8 @@ This script **requires** for you to have your "client_id" & "client_secret" conf
 
 *A key might be allready provided, if its expired, get your own following above steps*.
 
+Be sure to rename **config_TEMPLATE.ini** to **config.ini**.
+
 - open a terminal/powershell window in the cloned directory if you havent allready.
 
 - run the script as follows `python3 deviantart.py deviantart-username ` to download users main gallery like No Auth Script.
