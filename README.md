@@ -28,7 +28,8 @@ Main Script Usage (No Auth):
 
   > Example: `python3 __main.py hyanna-natsu --filetype png`
 
-**NOTE:** username is case-sensitive and it is the title of the user's page not the last part of the URL  
+**NOTE:** username is case-sensitive and it is the title of the user's page not the last part of the URL    
+<br />
 
 Alt Script Usage (Auth):  
 This script **requires** for you to have your "client_id" & "client_secret" configured in **client_auth.config**.
