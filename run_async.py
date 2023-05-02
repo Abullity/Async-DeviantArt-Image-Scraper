@@ -22,6 +22,7 @@ async def download_img(session, index, url):
                 if img_response.ok:
                     async with aiofiles.open(safe_title, mode='wb') as file:
                         await file.write(await img_response.read())
+                        print(f"Downloaded {safe_title}")
 
 
 async def request_next_bunch(session, params):
