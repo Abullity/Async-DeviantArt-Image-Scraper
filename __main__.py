@@ -27,10 +27,21 @@ def user_confirmation(account):
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, on_sigint)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("account", help="DeviantArt account name")
-    parser.add_argument("--filetype", help="File format of the downloaded images", default="jpg")
+    parser = argparse.ArgumentParser(
+        description=(
+            "A script to download images from a DeviantArt account.\n\n"
+            "Example usage without --filetype argument:\n"
+            "  __main__.py hyanna-natsu\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("account", help="DeviantArt account name", nargs="?")
+    parser.add_argument("--filetype", help="File format of the downloaded images (default: jpg)", default="jpg")
     args = parser.parse_args()
+
+    if not args.account:
+        parser.print_help()
+        sys.exit(0)
 
     account = args.account
     file_type = args.filetype
