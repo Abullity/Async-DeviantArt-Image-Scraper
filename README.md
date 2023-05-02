@@ -11,10 +11,8 @@ Setup:
 * install venv package
  `pip install virtualenv`
 
- * install dependecies for the project `pip install -r requirements.txt`
+ * install dependecies for the project `pip install -r requirements.txt`  
 
-   
-   
 
 Main Script Usage (No Auth):
 
@@ -30,12 +28,9 @@ Main Script Usage (No Auth):
 
   > Example: `python3 __main.py hyanna-natsu --filetype png`
 
-**NOTE:** username is case-sensitive and it is the title of the user's page not the last part of the URL
+**NOTE:** username is case-sensitive and it is the title of the user's page not the last part of the URL  
 
-
-
-Alt Script Usage (Auth):
-
+Alt Script Usage (Auth):  
 This script **requires** for you to have your "client_id" & "client_secret" configured in **client_auth.config**.
 
 > 1. Make an account with [deviantart](https://www.deviantart.com/join/)
@@ -61,7 +56,7 @@ This script **requires** for you to have your "client_id" & "client_secret" conf
 
   > Example: `python3 deviantart.py hyanna-natsu`
 
-##### Commands:
+#### Commands:
 
 `--help` Brings up the help page   
 
