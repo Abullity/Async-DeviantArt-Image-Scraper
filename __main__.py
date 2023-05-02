@@ -30,7 +30,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=(
             "A script to download images from a DeviantArt account.\n\n"
-            "Example usage without --filetype argument:\n"
+            "Example usage:\n"
             "  __main__.py hyanna-natsu\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
