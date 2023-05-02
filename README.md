@@ -32,7 +32,7 @@ Main Script Usage (No Auth):
 <br />
 
 Alt Script Usage (Auth):  
-This script **requires** for you to have your "client_id" & "client_secret" configured in **client_auth.config**.
+This script **requires** for you to have your "client_id" & "client_secret" configured in **config.ini**.
 
 > 1. Make an account with [deviantart](https://www.deviantart.com/join/)
 >
@@ -40,7 +40,7 @@ This script **requires** for you to have your "client_id" & "client_secret" conf
 >
 > 3. Follow This [Guide](https://www.wfdownloader.xyz/blog/how-to-bulk-download-deviantart-images-and-videos-via-api) if its to complicated (follow along till step 6)
 >
-> 4. now copy your "client_id" & "client_secret" to **client_auth.config**.
+> 4. now copy your "client_id" & "client_secret" to **config.ini**.
 >    should look like this:
 >
 >    > [credentials]  
