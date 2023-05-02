@@ -47,13 +47,13 @@ This script **requires** for you to have your "client_id" & "client_secret" conf
 > 4. now copy your "client_id" & "client_secret" to **client_auth.config**.
 >    should look like this:
 >
->    > [credentials]
->    > client_id = YOURID
->    > client_secret = YOURSECRETKEY
+>    > [credentials]  
+>    > client_id = YOURID  
+>    > client_secret = YOURSECRETKEY  
 >
 >    make sure its your actual ID & Key.
 
-*A key might be allready provided, if its expired, get your own following above steps*
+*A key might be allready provided, if its expired, get your own following above steps*.
 
 - open a terminal/powershell window in the cloned directory if you havent allready.
 
