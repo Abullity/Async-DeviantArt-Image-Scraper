@@ -3,6 +3,7 @@ import sys
 import time
 import asyncio
 import signal
+import argparse
 
 from run_async import main
 
@@ -24,17 +25,20 @@ def user_confirmation(account):
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, on_sigint)
 
-    if len(sys.argv) != 2:
-        print("Program needs 1 argument -- Deviantart account name!")
-        print("NOTE: account name [title of the user's page] is case-sensitive")
-    else:
-        account = sys.argv[1]
-        if os.path.exists(account) and not user_confirmation(account):
-            print("Operation canceled.")
-            sys.exit(0)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("account", help="DeviantArt account name")
+    parser.add_argument("--filetype", help="File format of the downloaded images", default="jpg")
+    args = parser.parse_args()
 
-        os.makedirs(account, exist_ok=True)
-        os.chdir(account)
-        start = time.perf_counter()
-        asyncio.run(main(account))
-        print(f"scraped in {time.perf_counter() - start} seconds!")
+    account = args.account
+    file_type = args.filetype
+
+    if os.path.exists(account) and not user_confirmation(account):
+        print("Operation canceled.")
+        sys.exit(0)
+
+    os.makedirs(account, exist_ok=True)
+    os.chdir(account)
+    start = time.perf_counter()
+    asyncio.run(main(account, file_type))
+    print(f"scraped in {time.perf_counter() - start} seconds!")
