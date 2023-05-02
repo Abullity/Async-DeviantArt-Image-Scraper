@@ -4,22 +4,24 @@ import time
 import asyncio
 import aiohttp
 import aiofiles
-
+import re
 
 API_URL = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents"
 
 
-async def download_img(session, title, url):
+async def download_img(session, index, url):
     url = "https://backend.deviantart.com/oembed?url=" + url
 
     async with session.get(url) as response:
         if response.ok:
             json = await response.json()
-    
-    async with session.get(json["url"]) as response:
-        if response.ok:
-            async with aiofiles.open(title, mode='wb') as file:
-                await file.write(await response.read())
+            # Replace any invalid characters for file names with underscores
+            safe_title = re.sub(r'[\\/*?:"<>|]', '_', json["title"]) + ".jpg"
+
+            async with session.get(json["url"]) as img_response:
+                if img_response.ok:
+                    async with aiofiles.open(safe_title, mode='wb') as file:
+                        await file.write(await img_response.read())
 
 
 async def request_next_bunch(session, params):
@@ -27,13 +29,13 @@ async def request_next_bunch(session, params):
     async with session.get(API_URL, params=params) as response:
         if response.ok:
             json = await response.json()
-            
-            for index, img in enumerate(json["results"]):
-                title, url = str(params["offset"] + index) + ".jpg", img["deviation"]["url"]
-                tasks.append(asyncio.create_task(download_img(session, title, url)))
 
-            params["offset"] = json["nextOffset"]    
-            
+            for index, img in enumerate(json["results"]):
+                url = img["deviation"]["url"]
+                tasks.append(asyncio.create_task(download_img(session, index, url)))
+
+            params["offset"] = json["nextOffset"]
+
             await asyncio.gather(*tasks)
 
 

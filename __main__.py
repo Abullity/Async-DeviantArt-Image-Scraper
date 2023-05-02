@@ -20,4 +20,3 @@ if __name__ == "__main__":
             print(f"scraped in {time.perf_counter() - start} seconds!")
         except FileExistsError:
             print(f"{account} has already been scraped!")
-        
