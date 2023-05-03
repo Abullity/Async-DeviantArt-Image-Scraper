@@ -3,10 +3,16 @@
 import sys
 import os
 import signal
-import requests
 import configparser
 import argparse
-from urllib.request import urlretrieve
+import asyncio
+import aiohttp
+from urllib.parse import urlsplit
+from pathlib import Path
+
+import nest_asyncio
+
+nest_asyncio.apply()  # Required to use asyncio in Jupyter/IPython
 
 parser = argparse.ArgumentParser(description="Download DeviantArt galleries and folders.")
 parser.add_argument("author", nargs="?", type=str, help="Author's DeviantArt username")
@@ -30,154 +36,130 @@ def read_credentials_from_config(config_file):
 
     return client_id, client_secret
 
-def authenticate(client_id, client_secret):
-    client_id, client_secret = read_credentials_from_config("config.ini")
+async def authenticate(client_id, client_secret):
     data = {
         "grant_type": "client_credentials",
         "client_id": client_id,
         "client_secret": client_secret,
     }
-    response = requests.post("https://www.deviantart.com/oauth2/token", data=data)
-    if response.status_code == 200:
-        return response.json()["access_token"]
-    else:
-        raise Exception("Failed to authenticate")
 
-def get_user_galleries(username, access_token):
+    async with aiohttp.ClientSession() as session:
+        async with session.post("https://www.deviantart.com/oauth2/token", data=data) as response:
+            if response.status == 200:
+                response_json = await response.json()
+                return response_json["access_token"]
+            else:
+                raise Exception("Failed to authenticate")
+
+async def download_file(session, url, file_path):
+    async with session.get(url) as response:
+        if response.status == 200:
+            with open(file_path, "wb") as f:
+                while True:
+                    chunk = await response.content.read(8192)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            print(f"Downloaded {file_path.name}")
+        else:
+            print(f"Failed to download {file_path.name}")
+
+async def download_items(author, access_token, folder_id=None, folder_name=None, default_filetype=None):
+    target_path = Path(author)
+    if folder_name:
+        target_path /= folder_name
+
+    target_path.mkdir(parents=True, exist_ok=True)
+
+    url = "https://www.deviantart.com/api/v1/oauth2/gallery/all" if folder_id is None else f"https://www.deviantart.com/api/v1/oauth2/gallery/{folder_id}"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    params = {"username": author, "offset": 0, "limit": 24}
+
+    async with aiohttp.ClientSession() as session:
+        while True:
+            async with session.get(url, headers=headers, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+
+                    download_tasks = []
+                    for item in data["results"]:
+                        if item["is_downloadable"]:
+                            title = item["title"].replace('/', '-')
+                            try:
+                                file_ext = item["content"]["filetype"].split('/')[-1]
+                            except KeyError:
+                                if default_filetype:
+                                    file_ext = default_filetype
+                            else:
+                                print(f"Failed to download {item['title']} due to missing filetype information")
+                                continue
+                            file_name = f"{title}.{file_ext}"
+                            file_path = target_path / file_name
+                            if not file_path.exists():
+                                download_tasks.append(download_file(session, item["content"]["src"], file_path))
+                            else:
+                                print(f"Skipped {file_name} (already exists)")
+
+                    await asyncio.gather(*download_tasks)
+
+                    if data["has_more"]:
+                        params["offset"] += len(data["results"])
+                    else:
+                        break
+                else:
+                    raise Exception("Failed to fetch gallery data")
+
+async def get_user_galleries(username, access_token):
     url = f"https://www.deviantart.com/api/v1/oauth2/gallery/folders"
     headers = {"Authorization": f"Bearer {access_token}"}
     params = {"username": username, "offset": 0, "limit": 10}
     galleries = []
 
-    while True:
-        response = requests.get(url, headers=headers, params=params)
-        response_data = response.json()
+    async with aiohttp.ClientSession() as session:
+        while True:
+            async with session.get(url, headers=headers, params=params) as response:
+                response_data = await response.json()
 
-        if "results" not in response_data:
-            break
+                if "results" not in response_data:
+                    break
 
-        galleries.extend(response_data["results"])
+                galleries.extend(response_data["results"])
 
-        if not response_data["has_more"]:
-            break
+                if not response_data["has_more"]:
+                    break
 
-        params["offset"] += response_data["next_offset"]
+                params["offset"] += response_data["next_offset"]
 
     return galleries
 
 def list_folders(author, access_token):
-    galleries = get_user_galleries(author, access_token)
+    galleries = asyncio.run(get_user_galleries(author, access_token))
 
     for gallery in galleries:
         folder_id = gallery["folderid"]
         folder_name = gallery["name"].replace('/', '-')
         print(f"{folder_name} [{folder_id}]")
 
-def download_gallery(author, access_token, default_filetype=None):
-    author_dir = author
-    if not os.path.exists(author_dir):
-        os.makedirs(author_dir)
+async def download_all_folders(author, access_token, default_filetype=None):
+    galleries = await get_user_galleries(author, access_token)
 
-    url = "https://www.deviantart.com/api/v1/oauth2/gallery/all"
-    params = {
-        "access_token": access_token,
-        "username": author,
-        "offset": 0,
-        "limit": 24,
-    }
-
-    while True:
-        response = requests.get(url, params=params)
-        if response.status_code == 200:
-            data = response.json()
-            for item in data["results"]:
-                if item["is_downloadable"]:
-                    title = item["title"].replace('/', '-')
-                    try:
-                        file_ext = item["content"]["filetype"].split('/')[-1]
-                    except KeyError:
-                        if default_filetype:
-                            file_ext = default_filetype
-                        else:
-                            print(f"Failed to download {item['title']} due to missing filetype information")
-                            continue
-                    file_name = f"{title}.{file_ext}"
-                    file_path = os.path.join(author_dir, file_name)
-                    if not os.path.exists(file_path):
-                        urlretrieve(item["content"]["src"], file_path)
-                        print(f"Downloaded {file_name}")
-                    else:
-                        print(f"Skipped {file_name} (already exists)")
-            if data["has_more"]:
-                params["offset"] += len(data["results"])
-            else:
-                break
-        else:
-            raise Exception("Failed to fetch gallery data")
-
-def download_folder(author, folder_id, access_token, folder_name, default_filetype=None):
-    folder_dir = os.path.join(author, folder_name)
-    
-    if not os.path.exists(folder_dir):
-        os.makedirs(folder_dir)
-
-    url = f"https://www.deviantart.com/api/v1/oauth2/gallery/{folder_id}"
-    params = {
-        "access_token": access_token,
-        "username": author,
-        "offset": 0,
-        "limit": 24,
-    }
-
-    while True:
-        response = requests.get(url, params=params)
-        if response.status_code == 200:
-            data = response.json()
-            for item in data["results"]:
-                if item["is_downloadable"]:
-                    title = item["title"].replace('/', '-')
-                    try:
-                        file_ext = item["content"]["filetype"].split('/')[-1]
-                    except KeyError:
-                        if default_filetype:
-                            file_ext = default_filetype
-                        else:
-                            print(f"Failed to download {item['title']} due to missing filetype information")
-                            continue
-                    file_name = f"{title}.{file_ext}"
-                    file_path = os.path.join(folder_dir, file_name)
-                    if os.path.exists(file_path):
-                        print(f"Skipping existing file: {file_path}")
-                        continue
-                    urlretrieve(item["content"]["src"], file_path)
-                    print(f"Downloaded {file_name}")
-            if data["has_more"]:
-                params["offset"] += len(data["results"])
-            else:
-                break
-        else:
-            raise Exception("Failed to fetch gallery data")
-
-def download_all_folders(author, access_token, default_filetype=None):
-    galleries = get_user_galleries(author, access_token)
-    
-    if not os.path.exists(author):
-        os.makedirs(author)
-    
     for gallery in galleries:
         folder_id = gallery["folderid"]
         folder_name = gallery["name"].replace('/', '-')
-        download_folder(author, folder_id, access_token, folder_name, default_filetype)
+        await download_items(author, access_token, folder_id, folder_name, default_filetype)
 
-def get_folder_name_and_dir(author, folder_id):
-    galleries = get_user_galleries(author, access_token)
+def get_folder_name_and_dir(author, folder_id, access_token):
+    folder_name = None
+    folder_dir = None
+
+    galleries = asyncio.run(get_user_galleries(author, access_token))
     for gallery in galleries:
         if gallery["folderid"] == folder_id:
             folder_name = gallery["name"].replace('/', '-')
             folder_dir = os.path.join(author, folder_name)
-            return folder_name, folder_dir
-    else:
-        raise Exception(f"Folder {folder_id} not found for author {author}")
+            break
+
+    return folder_name, folder_dir
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -187,17 +169,16 @@ if __name__ == "__main__":
         sys.exit(0)
 
     client_id, client_secret = read_credentials_from_config("config.ini")
-    access_token = authenticate(client_id, client_secret)
+    access_token = asyncio.run(authenticate(client_id, client_secret))
 
     if args.list:
         list_folders(args.author, access_token)
     elif args.folder:
         folder_id = args.folder
-        folder_name, _ = get_folder_name_and_dir(args.author, folder_id)
-        download_folder(args.author, folder_id, access_token, folder_name, args.filetype)
+        folder_name, _ = get_folder_name_and_dir(args.author, folder_id, access_token)
+        asyncio.run(download_items(args.author, access_token, folder_id, folder_name, args.filetype))
     elif args.all:
-        download_gallery(args.author, access_token, args.filetype)
-        download_all_folders(args.author, access_token, args.filetype)
+        asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
+        asyncio.run(download_all_folders(args.author, access_token, args.filetype))
     else:
-        download_gallery(args.author, access_token, args.filetype)
-
+        asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
