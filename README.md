@@ -75,6 +75,4 @@ Be sure to rename **config_TEMPLATE.ini** to **config.ini**.
 
 > Example: `python3 deviantart.py hyanna-natsu --folder FE7E3825-13A5-9FAC-A7A7-A188ACC39877` Downloads Kemonomimi Folder.
 
-`--all` Downloads everything, entire gallery and all folders.   
-
-**Note:** This script is a little slower then the No Auth Script.
+`--all` Downloads everything, entire gallery and all folders.
