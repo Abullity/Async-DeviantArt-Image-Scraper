@@ -27,14 +27,32 @@ def sigint_handler(signal, frame):
 
 signal.signal(signal.SIGINT, sigint_handler)
 
-def read_credentials_from_config(config_file):
+def read_config(config_file):
     config = configparser.ConfigParser()
     config.read(config_file)
 
-    client_id = config.get("credentials", "client_id")
-    client_secret = config.get("credentials", "client_secret")
+    try:
+        client_id = config.get("credentials", "client_id")
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        print("Please set the client_id in the config file.")
+        sys.exit(1)
 
-    return client_id, client_secret
+    try:
+        client_secret = config.get("credentials", "client_secret")
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        print("Please set the client_secret in the config file.")
+        sys.exit(1)
+
+    try:
+        max_concurrent_downloads = config.getint("settings", "max_concurrent_downloads")
+        if max_concurrent_downloads < 1:
+            print("Please set max_concurrent_downloads to a value of 1 or greater.")
+            sys.exit(1)
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        print("Please set max_concurrent_downloads in the config file.")
+        sys.exit(1)
+
+    return client_id, client_secret, max_concurrent_downloads
 
 async def authenticate(client_id, client_secret):
     data = {
@@ -76,31 +94,32 @@ async def download_items(author, access_token, folder_id=None, folder_name=None,
     params = {"username": author, "offset": 0, "limit": 24}
 
     async with aiohttp.ClientSession() as session:
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+        async def download_item(item):
+            async with semaphore:
+                if item["is_downloadable"]:
+                    title = item["title"].replace('/', '-')
+                    try:
+                        file_ext = item["content"]["filetype"].split('/')[-1]
+                    except KeyError:
+                        if default_filetype:
+                            file_ext = default_filetype
+                    else:
+                        print(f"Failed to download {item['title']} due to missing filetype information")
+                        return
+                    file_name = f"{title}.{file_ext}"
+                    file_path = target_path / file_name
+                    if not file_path.exists():
+                        await download_file(session, item["content"]["src"], file_path)
+                    else:
+                        print(f"Skipped {file_name} (already exists)")
+
         while True:
             async with session.get(url, headers=headers, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
-
-                    download_tasks = []
-                    for item in data["results"]:
-                        if item["is_downloadable"]:
-                            title = item["title"].replace('/', '-')
-                            try:
-                                file_ext = item["content"]["filetype"].split('/')[-1]
-                            except KeyError:
-                                if default_filetype:
-                                    file_ext = default_filetype
-                            else:
-                                print(f"Failed to download {item['title']} due to missing filetype information")
-                                continue
-                            file_name = f"{title}.{file_ext}"
-                            file_path = target_path / file_name
-                            if not file_path.exists():
-                                download_tasks.append(download_file(session, item["content"]["src"], file_path))
-                            else:
-                                print(f"Skipped {file_name} (already exists)")
-
-                    await asyncio.gather(*download_tasks)
+                    await asyncio.gather(*(download_item(item) for item in data["results"]))
 
                     if data["has_more"]:
                         params["offset"] += len(data["results"])
@@ -168,7 +187,7 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(0)
 
-    client_id, client_secret = read_credentials_from_config("config.ini")
+    client_id, client_secret, MAX_CONCURRENT_DOWNLOADS = read_config("config.ini")
     access_token = asyncio.run(authenticate(client_id, client_secret))
 
     if args.list:
