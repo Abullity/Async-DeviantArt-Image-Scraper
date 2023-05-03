@@ -103,7 +103,7 @@ async def download_items(author, access_token, folder_id=None, folder_name=None,
     target_path.mkdir(parents=True, exist_ok=True)
 
     if collection:
-        url = "https://www.deviantart.com/api/v1/oauth2/collections/all"
+        url = "https://www.deviantart.com/api/v1/oauth2/collections/all" if folder_id is None else f"https://www.deviantart.com/api/v1/oauth2/collections/{folder_id}"
     else:
         url = "https://www.deviantart.com/api/v1/oauth2/gallery/all" if folder_id is None else f"https://www.deviantart.com/api/v1/oauth2/gallery/{folder_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -178,6 +178,37 @@ def list_folders(author, access_token):
         folder_id = gallery["folderid"]
         folder_name = gallery["name"].replace('/', '-')
         print(f"{folder_name} [{folder_id}]")
+        
+async def get_user_collections(username, access_token):
+    url = f"https://www.deviantart.com/api/v1/oauth2/collections/folders"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    params = {"username": username, "offset": 0, "limit": 10}
+    collections = []
+
+    async with aiohttp.ClientSession() as session:
+        while True:
+            async with session.get(url, headers=headers, params=params) as response:
+                response_data = await response.json()
+
+                if "results" not in response_data:
+                    break
+
+                collections.extend(response_data["results"])
+
+                if not response_data["has_more"]:
+                    break
+
+                params["offset"] += response_data["next_offset"]
+
+    return collections
+
+def list_collections(author, access_token):
+    collections = asyncio.run(get_user_collections(author, access_token))
+
+    for collection in collections:
+        folder_id = collection["folderid"]
+        folder_name = collection["name"].replace('/', '-')
+        print(f"{folder_name} [{folder_id}]")
 
 async def download_all_folders(author, access_token, default_filetype=None):
     galleries = await get_user_galleries(author, access_token)
@@ -187,14 +218,18 @@ async def download_all_folders(author, access_token, default_filetype=None):
         folder_name = gallery["name"].replace('/', '-')
         await download_items(author, access_token, folder_id, folder_name, default_filetype)
 
-def get_folder_name_and_dir(author, folder_id, access_token):
+def get_folder_name_and_dir(author, folder_id, access_token, collection=False):
     folder_name = None
     folder_dir = None
 
-    galleries = asyncio.run(get_user_galleries(author, access_token))
-    for gallery in galleries:
-        if gallery["folderid"] == folder_id:
-            folder_name = gallery["name"].replace('/', '-')
+    if collection:
+        folders = asyncio.run(get_user_collections(author, access_token))
+    else:
+        folders = asyncio.run(get_user_galleries(author, access_token))
+    
+    for folder in folders:
+        if folder["folderid"] == folder_id:
+            folder_name = folder["name"].replace('/', '-')
             folder_dir = os.path.join(author, folder_name)
             break
 
@@ -214,19 +249,22 @@ if __name__ == "__main__":
     except InvalidConfigError:
         sys.exit(1)
 
-    if args.list:
+    if args.list and args.collection:
+        list_collections(args.author, access_token)
+    elif args.list:
         list_folders(args.author, access_token)
     elif args.folder:
         folder_id = args.folder
-        folder_name, _ = get_folder_name_and_dir(args.author, folder_id, access_token)
-        asyncio.run(download_items(args.author, access_token, folder_id, folder_name, args.filetype))
+        if args.collection:
+            folder_name, _ = get_folder_name_and_dir(args.author, folder_id, access_token, collection=True)
+            asyncio.run(download_items(args.author, access_token, folder_id, folder_name, args.filetype, collection=True))
+        else:
+            folder_name, _ = get_folder_name_and_dir(args.author, folder_id, access_token)
+            asyncio.run(download_items(args.author, access_token, folder_id, folder_name, args.filetype))
     else:
         if args.all:
             asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
             asyncio.run(download_all_folders(args.author, access_token, args.filetype))
-        
+
         if args.collection:
             asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype, collection=True))
-
-        if not args.all and not args.collection:
-            asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))

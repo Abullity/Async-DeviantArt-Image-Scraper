@@ -79,4 +79,6 @@ Be sure to rename **config_TEMPLATE.ini** to **config.ini**.
 
 `--collection` Downloads all images from the author's collection.    
 
-> Example: `python3 deviantart.py hyanna-natsu --collection`
+> Example: `python3 deviantart.py hyanna-natsu --collection`  
+
+**Note:** When using `--collection` in conjunction with `--list` `--folder` this will show/download from the author's collection otherwise it will targer their gallary if the `--collection` argument is not passed. 
