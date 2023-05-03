@@ -81,4 +81,4 @@ Be sure to rename **config_TEMPLATE.ini** to **config.ini**.
 
 > Example: `python3 deviantart.py hyanna-natsu --collection`  
 
-**Note:** When using `--collection` in conjunction with `--list` | `--folder` this will show/download from the author's collection otherwise it will targert their gallary if the `--collection` argument is not passed. 
+**Note:** When using `--collection` in conjunction with `--list` | `--folder` this will show/download from the author's collection otherwise it will target their gallary if the `--collection` argument is not passed. 
