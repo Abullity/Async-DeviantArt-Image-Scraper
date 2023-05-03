@@ -171,8 +171,33 @@ async def get_user_galleries(username, access_token):
 
     return galleries
 
-def list_folders(author, access_token):
-    galleries = asyncio.run(get_user_galleries(author, access_token))
+def list_folders(author, access_token, collection=False):
+    if collection:
+        endpoint = "https://www.deviantart.com/api/v1/oauth2/collections/folders"
+    else:
+        endpoint = "https://www.deviantart.com/api/v1/oauth2/gallery/folders"
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    params = {"username": author, "offset": 0, "limit": 10}
+    galleries = []
+
+    async def fetch_folders():
+        async with aiohttp.ClientSession() as session:
+            while True:
+                async with session.get(endpoint, headers=headers, params=params) as response:
+                    response_data = await response.json()
+
+                    if "results" not in response_data:
+                        break
+
+                    galleries.extend(response_data["results"])
+
+                    if not response_data["has_more"]:
+                        break
+
+                    params["offset"] += response_data["next_offset"]
+
+    asyncio.run(fetch_folders())
 
     for gallery in galleries:
         folder_id = gallery["folderid"]
