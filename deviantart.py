@@ -110,6 +110,10 @@ async def download_items(author, access_token, folder_id=None, folder_name=None,
 
         async def download_item(item):
             async with semaphore:
+                if "content" not in item:
+                    print(f"Skipping {item['title']} - no content found.")
+                    return
+        
                 if item["is_downloadable"]:
                     title = item["title"].replace('/', '-')
                     try:
