@@ -33,12 +33,18 @@ def read_config(config_file):
 
     try:
         client_id = config.get("credentials", "client_id")
+        if not client_id:
+            print("Please set the client_id in the config file.")
+            sys.exit(1)
     except (configparser.NoSectionError, configparser.NoOptionError):
         print("Please set the client_id in the config file.")
         sys.exit(1)
 
     try:
         client_secret = config.get("credentials", "client_secret")
+        if not client_secret:
+            print("Please set the client_secret in the config file.")
+            sys.exit(1)
     except (configparser.NoSectionError, configparser.NoOptionError):
         print("Please set the client_secret in the config file.")
         sys.exit(1)
