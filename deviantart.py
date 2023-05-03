@@ -249,22 +249,18 @@ if __name__ == "__main__":
     except InvalidConfigError:
         sys.exit(1)
 
-    if args.list and args.collection:
-        list_collections(args.author, access_token)
-    elif args.list:
-        list_folders(args.author, access_token)
+    if args.list:
+        list_folders(args.author, access_token, args.collection)
     elif args.folder:
-        folder_id = args.folder
-        if args.collection:
-            folder_name, _ = get_folder_name_and_dir(args.author, folder_id, access_token, collection=True)
-            asyncio.run(download_items(args.author, access_token, folder_id, folder_name, args.filetype, collection=True))
-        else:
-            folder_name, _ = get_folder_name_and_dir(args.author, folder_id, access_token)
-            asyncio.run(download_items(args.author, access_token, folder_id, folder_name, args.filetype))
-    else:
-        if args.all:
-            asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
-            asyncio.run(download_all_folders(args.author, access_token, args.filetype))
-
+        folder_name, _ = get_folder_name_and_dir(args.author, args.folder, access_token, args.collection)
+        asyncio.run(download_items(args.author, access_token, args.folder, folder_name, args.filetype, args.collection))
+    elif args.all:
+        asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
+        asyncio.run(download_all_folders(args.author, access_token, args.filetype))
         if args.collection:
             asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype, collection=True))
+    elif args.collection:
+        asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype, collection=True))
+    else:
+        asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
+        
