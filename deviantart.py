@@ -21,6 +21,9 @@ parser.add_argument("-f", "--filetype", type=str, default="jpg", help="Default f
 parser.add_argument("--folder", type=str, help="Download the specified folder by its ID")
 parser.add_argument("--all", action="store_true", help="Download all images from the author's gallery and all folders")
 
+class InvalidConfigError(Exception):
+    pass
+
 def sigint_handler(signal, frame):
     print("\nInterrupted. Exiting...")
     sys.exit(0)
@@ -61,19 +64,22 @@ def read_config(config_file):
     return client_id, client_secret, max_concurrent_downloads
 
 async def authenticate(client_id, client_secret):
-    data = {
-        "grant_type": "client_credentials",
-        "client_id": client_id,
-        "client_secret": client_secret,
-    }
-
     async with aiohttp.ClientSession() as session:
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+        }
         async with session.post("https://www.deviantart.com/oauth2/token", data=data) as response:
-            if response.status == 200:
+            try:
                 response_json = await response.json()
+                if "error" in response_json:
+                    print("Invalid client_id or client_secret. Please check the config file.")
+                    raise InvalidConfigError("Invalid client_id or client_secret")
                 return response_json["access_token"]
-            else:
-                raise Exception("Failed to authenticate")
+            except aiohttp.ContentTypeError as e:
+                print("Invalid client_id or client_secret. Please check the config file.")
+                raise InvalidConfigError("Invalid client_id or client_secret")
 
 async def download_file(session, url, file_path):
     async with session.get(url) as response:
@@ -194,7 +200,11 @@ if __name__ == "__main__":
         sys.exit(0)
 
     client_id, client_secret, MAX_CONCURRENT_DOWNLOADS = read_config("config.ini")
-    access_token = asyncio.run(authenticate(client_id, client_secret))
+    
+    try:
+        access_token = asyncio.run(authenticate(client_id, client_secret))
+    except InvalidConfigError:
+        sys.exit(1)
 
     if args.list:
         list_folders(args.author, access_token)
