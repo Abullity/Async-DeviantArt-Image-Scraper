@@ -14,12 +14,13 @@ import nest_asyncio
 
 nest_asyncio.apply()  # Required to use asyncio in Jupyter/IPython
 
-parser = argparse.ArgumentParser(description="Download DeviantArt galleries and folders.")
+parser = argparse.ArgumentParser(description="Download DeviantArt galleries, folders and collections.")
 parser.add_argument("author", nargs="?", type=str, help="Author's DeviantArt username")
 parser.add_argument("--list", action="store_true", help="List the author's folders")
 parser.add_argument("-f", "--filetype", type=str, default="jpg", help="Default file type to use if the original file type is missing (e.g., jpg, png)")
 parser.add_argument("--folder", type=str, help="Download the specified folder by its ID")
 parser.add_argument("--all", action="store_true", help="Download all images from the author's gallery and all folders")
+parser.add_argument("--collection", action="store_true", help="Download all images from the author's collection")
 
 class InvalidConfigError(Exception):
     pass
@@ -94,14 +95,17 @@ async def download_file(session, url, file_path):
         else:
             print(f"Failed to download {file_path.name}")
 
-async def download_items(author, access_token, folder_id=None, folder_name=None, default_filetype=None):
+async def download_items(author, access_token, folder_id=None, folder_name=None, default_filetype=None, collection=False):
     target_path = Path(author)
     if folder_name:
         target_path /= folder_name
 
     target_path.mkdir(parents=True, exist_ok=True)
 
-    url = "https://www.deviantart.com/api/v1/oauth2/gallery/all" if folder_id is None else f"https://www.deviantart.com/api/v1/oauth2/gallery/{folder_id}"
+    if collection:
+        url = "https://www.deviantart.com/api/v1/oauth2/collections/all"
+    else:
+        url = "https://www.deviantart.com/api/v1/oauth2/gallery/all" if folder_id is None else f"https://www.deviantart.com/api/v1/oauth2/gallery/{folder_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
     params = {"username": author, "offset": 0, "limit": 24}
 
@@ -216,8 +220,13 @@ if __name__ == "__main__":
         folder_id = args.folder
         folder_name, _ = get_folder_name_and_dir(args.author, folder_id, access_token)
         asyncio.run(download_items(args.author, access_token, folder_id, folder_name, args.filetype))
-    elif args.all:
-        asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
-        asyncio.run(download_all_folders(args.author, access_token, args.filetype))
     else:
-        asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
+        if args.all:
+            asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
+            asyncio.run(download_all_folders(args.author, access_token, args.filetype))
+        
+        if args.collection:
+            asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype, collection=True))
+
+        if not args.all and not args.collection:
+            asyncio.run(download_items(args.author, access_token, default_filetype=args.filetype))
